@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Тест сканерів штрихкодів</title>
+  <!-- Підключення Html5-QRCode та ZXing для порівняння -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --card: #181b22;
+      --border: #2a2f3a;
+      --accent: #10b981;
+      --accent-blue: #3b82f6;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 12px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .app-container {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #1f2937;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    /* Перемикач рушіїв */
+    .engine-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      background: var(--card);
+      padding: 6px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .engine-tab {
+      padding: 10px 8px;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .engine-tab.active {
+      background: #1e293b;
+      color: #fff;
+      border-color: var(--accent-blue);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+    }
+    .engine-tab small {
+      display: block;
+      font-size: 10px;
+      font-weight: 400;
+      opacity: 0.75;
+      margin-top: 2px;
+    }
+
+    /* Вікно камери */
+    .scanner-wrapper {
+      position: relative;
+      width: 100%;
+      height: 280px;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .viewfinder {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 82%;
+      height: 42%;
+      box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.55);
+      border: 2px solid var(--accent);
+      border-radius: 10px;
+      pointer-events: none;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .viewfinder.flash {
+      border-color: #fff;
+      background: rgba(16, 185, 129, 0.25);
+      transform: translate(-50%, -50%) scale(1.03);
+    }
+    .viewfinder::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 6%;
+      right: 6%;
+      height: 1px;
+      background: rgba(239, 68, 68, 0.7);
+      box-shadow: 0 0 6px #ef4444;
+    }
+    .hud-overlay {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      right: 8px;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      font-size: 11px;
+      font-family: monospace;
+    }
+    .hud-pill {
+      background: rgba(0, 0, 0, 0.7);
+      padding: 4px 8px;
+      border-radius: 6px;
+      backdrop-filter: blur(4px);
+    }
+
+    /* Налаштування та кнопки */
+    .controls-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      flex: 1;
+      min-width: 110px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: #fff;
+    }
+    .btn-active {
+      background: var(--warn);
+      border-color: var(--warn);
+      color: #000;
+    }
+
+    .settings-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .setting-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .setting-item label {
+      color: var(--muted);
+      font-size: 11px;
+    }
+    select {
+      background: #111318;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px;
+      font-size: 12px;
+    }
+
+    /* Результат */
+    .result-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .result-value {
+      font-size: 20px;
+      font-weight: 700;
+      font-family: monospace;
+      color: var(--accent);
+      word-break: break-all;
+    }
+    .result-meta {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* Історія зчитувань */
+    .history-list {
+      margin-top: 8px;
+      max-height: 130px;
+      overflow-y: auto;
+      border-top: 1px solid var(--border);
+      padding-top: 6px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px dashed #222630;
+    }
+
+    /* Лог-панель */
+    #log-panel {
+      background: #090a0d;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 11px;
+      font-family: monospace;
+      line-height: 1.4;
+      max-height: 130px;
+      overflow-y: auto;
+    }
+    .err { color: var(--danger); }
+    .ok { color: var(--accent); }
+    .warn { color: var(--warn); }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <h1>
+    <span>📱 Лабораторія Сканерів</span>
+    <span id="https-badge" class="badge">Перевірка...</span>
+  </h1>
+
+  <!-- Вибір рушія розпізнавання -->
+  <div class="engine-tabs">
+    <button class="engine-tab active" data-engine="native">
+      1. Native API
+      <small>ML Kit / Hardware</small>
+    </button>
+    <button class="engine-tab" data-engine="zbar">
+      2. ZBar WASM
+      <small>@undecaf/zbar-wasm</small>
+    </button>
+    <button class="engine-tab" data-engine="html5qrcode">
+      3. Html5-QRCode
+      <small>Популярна обгортка</small>
+    </button>
+    <button class="engine-tab" data-engine="zxing">
+      4. ZXing-JS
+      <small>Поточний + ROI фікс</small>
+    </button>
+  </div>
+
+  <!-- Відео та приціл -->
+  <div class="scanner-wrapper">
+    <video id="camera-stream" playsinline autoplay muted></video>
+    <div id="viewfinder" class="viewfinder"></div>
+    <div class="hud-overlay">
+      <span id="hud-engine" class="hud-pill">Рушій: Native</span>
+      <span id="hud-perf" class="hud-pill">0 мс / кадр</span>
+    </div>
+  </div>
+
+  <!-- Кнопки керування -->
+  <div class="controls-row">
+    <button id="toggle-cam-btn" class="btn btn-primary">🔄 Перезапустити камеру</button>
+    <button id="toggle-torch-btn" class="btn" style="display:none;">🔦 Ліхтарик</button>
+    <button id="clear-btn" class="btn">🧹 Очистити</button>
+  </div>
+
+  <!-- Налаштування стабільності -->
+  <div class="settings-card">
+    <div class="setting-item">
+      <label for="confirm-select">Multi-frame підтвердження (1D):</label>
+      <select id="confirm-select">
+        <option value="1">1 кадр (Миттєво, ризик збоїв)</option>
+        <option value="2" selected>2 кадри поспіль (Оптимально)</option>
+        <option value="3">3 кадри поспіль (Макс. надійність)</option>
+      </select>
+    </div>
+    <div class="setting-item">
+      <label for="roi-select">Зона сканування (ROI):</label>
+      <select id="roi-select">
+        <option value="crop" selected>Тільки рамка прицілу (Швидше)</option>
+        <option value="full">Весь кадр камери</option>
+      </select>
+    </div>
+    <div class="setting-item">
+      <label for="res-select">Роздільна здатність:</label>
+      <select id="res-select">
+        <option value="720" selected>1280×720 (HD - Рекомендовано)</option>
+        <option value="1080">1920×1080 (Full HD - Чіткіше)</option>
+      </select>
+    </div>
+    <div class="setting-item">
+      <label for="formats-select">Фільтр форматів:</label>
+      <select id="formats-select">
+        <option value="strict" selected>Тільки основні (EAN/Code128/QR)</option>
+        <option value="all">Усі формати (Більше помилок)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Останній результат та історія -->
+  <div class="result-card">
+    <div class="result-header">
+      <span>Останній зчитаний код</span>
+      <span id="scan-counter">Всього: 0</span>
+    </div>
+    <div id="result-value" class="result-value">Наведіть на штрихкод...</div>
+    <div id="result-meta" class="result-meta">
+      <span>Формат: —</span>
+      <span>Час декодування: —</span>
+      <span>Рушій: —</span>
+    </div>
+    <div id="history-list" class="history-list"></div>
+  </div>
+
+  <!-- Системний лог -->
+  <div id="log-panel"></div>
+</div>
+
+<!-- Прихований canvas для вирізання ROI та передачі кадрів у ZBar / ZXing / Html5Qrcode -->
+<canvas id="roi-canvas" style="display:none;"></canvas>
+
+<script type="module">
+  const video = document.getElementById('camera-stream');
+  const viewfinder = document.getElementById('viewfinder');
+  const hudEngine = document.getElementById('hud-engine');
+  const hudPerf = document.getElementById('hud-perf');
+  const resultValue = document.getElementById('result-value');
+  const resultMeta = document.getElementById('result-meta');
+  const scanCounterEl = document.getElementById('scan-counter');
+  const historyList = document.getElementById('history-list');
+  const logPanel = document.getElementById('log-panel');
+  const httpsBadge = document.getElementById('https-badge');
+
+  const toggleCamBtn = document.getElementById('toggle-cam-btn');
+  const toggleTorchBtn = document.getElementById('toggle-torch-btn');
+  const clearBtn = document.getElementById('clear-btn');
+
+  const confirmSelect = document.getElementById('confirm-select');
+  const roiSelect = document.getElementById('roi-select');
+  const resSelect = document.getElementById('res-select');
+  const formatsSelect = document.getElementById('formats-select');
+
+  const roiCanvas = document.getElementById('roi-canvas');
+  const roiCtx = roiCanvas.getContext('2d', { willReadFrequently: true });
+
+  // Стан додатку
+  let currentEngine = 'native'; // 'native' | 'zbar' | 'html5qrcode' | 'zxing'
+  let stream = null;
+  let videoTrack = null;
+  let torchState = false;
+  let isScanning = false;
+  let scanTimer = null;
+
+  // Екземпляри детекторів
+  let nativeDetector = null;
+  let zbarPolyfillDetector = null;
+  let zxingReader = null;
+
+  // Статистика та анти-брязкіт (multi-frame confirmation)
+  let lastCandidate = null;
+  let candidateMatches = 0;
+  let totalScans = 0;
+  const scanHistory = new Map(); // code -> { count, format, engine, time }
+
+  function log(msg, type = 'info') {
+    const el = document.createElement('div');
+    if (type === 'err') el.className = 'err';
+    if (type === 'ok') el.className = 'ok';
+    if (type === 'warn') el.className = 'warn';
+    el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    logPanel.appendChild(el);
+    logPanel.scrollTop = logPanel.scrollHeight;
+  }
+
+  // 1. Перевірка HTTPS / Secure Context
+  function checkEnvironment() {
+    if (window.isSecureContext) {
+      httpsBadge.textContent = "🔒 HTTPS OK";
+      httpsBadge.style.color = "#10b981";
+      return true;
+    } else {
+      httpsBadge.textContent = "⚠️ Немає HTTPS";
+      httpsBadge.style.color = "#ef4444";
+      log("ПОМИЛКА: Сторінка відкрита без HTTPS! Камера заблокована браузером.", "err");
+      return false;
+    }
+  }
+
+  // 2. Ініціалізація різних рушіїв
+  async function ensureDetectorsReady() {
+    const strictFormats = ['qr_code', 'ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf'];
+
+    // A) Нативний BarcodeDetector
+    if (currentEngine === 'native') {
+      if ('BarcodeDetector' in window && !window.__isPolyfill) {
+        try {
+          const supported = await window.BarcodeDetector.getSupportedFormats();
+          const formats = formatsSelect.value === 'strict'
+            ? strictFormats.filter(f => supported.includes(f))
+            : supported;
+          nativeDetector = new window.BarcodeDetector({ formats });
+          log(`Нативний BarcodeDetector активний (${formats.length} форматів)`, 'ok');
+          return;
+        } catch (e) {
+          log(`Нативний BarcodeDetector недоступний: ${e.message}. Перехід на ZBar WASM...`, 'warn');
+        }
+      } else {
+        log("У цьому браузері немає апаратного BarcodeDetector. Вмикаємо WASM-поліфіл...", "warn");
+      }
+    }
+
+    // B) ZBar WASM (@undecaf/barcode-detector-polyfill)
+    if (currentEngine === 'zbar' || (currentEngine === 'native' && !nativeDetector)) {
+      if (!zbarPolyfillDetector) {
+        log("Завантаження ZBar WASM (@undecaf/barcode-detector-polyfill)...", "info");
+        const mod = await import("https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.min.js");
+        const PolyfillClass = mod.BarcodeDetectorPolyfill;
+        const supported = await PolyfillClass.getSupportedFormats();
+        const formats = formatsSelect.value === 'strict'
+          ? strictFormats.filter(f => supported.includes(f))
+          : supported;
+        zbarPolyfillDetector = new PolyfillClass({ formats });
+        log("ZBar WASM готовий до роботи!", "ok");
+      }
+    }
+
+    // C) ZXing-JS
+    if (currentEngine === 'zxing') {
+      if (!window.ZXing) {
+        log("Бібліотека ZXing ще не завантажена", "err");
+        return;
+      }
+      const hints = new Map();
+      if (formatsSelect.value === 'strict') {
+        const BFormat = window.ZXing.BarcodeFormat;
+        hints.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+          BFormat.QR_CODE,
+          BFormat.EAN_13,
+          BFormat.EAN_8,
+          BFormat.CODE_128,
+          BFormat.CODE_39,
+          BFormat.UPC_A,
+          BFormat.ITF
+        ]);
+      }
+      hints.set(window.ZXing.DecodeHintType.TRY_HARDER, true);
+      zxingReader = new window.ZXing.BrowserMultiFormatReader(hints);
+      log(`ZXing ініціалізовано (TRY_HARDER + ${formatsSelect.value === 'strict' ? 'обмежені формати' : 'всі формати'})`, 'ok');
+    }
+
+    // D) Html5-QRCode (використовуємо внутрішній декодер по canvas/image або BarcodeDetector)
+    if (currentEngine === 'html5qrcode') {
+      log("Html5-QRCode готовий (режим декодування кадру)", "ok");
+    }
+  }
+
+  // 3. Запуск камери
+  async function startCamera() {
+    if (!checkEnvironment()) return;
+    stopCamera();
+
+    const heightIdeal = parseInt(resSelect.value, 10);
+    const widthIdeal = heightIdeal === 1080 ? 1920 : 1280;
+
+    const constraints = {
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: widthIdeal },
+        height: { ideal: heightIdeal },
+        advanced: [{ focusMode: "continuous" }]
+      }
+    };
+
+    try {
+      log(`Запуск камери (${widthIdeal}x${heightIdeal})...`);
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = stream;
+      await video.play();
+
+      videoTrack = stream.getVideoTracks()[0];
+      const settings = videoTrack.getSettings ? videoTrack.getSettings() : {};
+      log(`Камера активна: ${settings.width || '?'}x${settings.height || '?'}`, 'ok');
+
+      setupTorch(videoTrack);
+      await ensureDetectorsReady();
+
+      isScanning = true;
+      scheduleNextScan();
+    } catch (err) {
+      log(`Помилка камери [${err.name}]: ${err.message}`, 'err');
+    }
+  }
+
+  function stopCamera() {
+    isScanning = false;
+    if (scanTimer) clearTimeout(scanTimer);
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+  }
+
+  function setupTorch(track) {
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (caps.torch) {
+      toggleTorchBtn.style.display = 'inline-block';
+    } else {
+      toggleTorchBtn.style.display = 'none';
+    }
+  }
+
+  toggleTorchBtn.addEventListener('click', async () => {
+    if (!videoTrack) return;
+    torchState = !torchState;
+    try {
+      await videoTrack.applyConstraints({ advanced: [{ torch: torchState }] });
+      toggleTorchBtn.classList.toggle('btn-active', torchState);
+      toggleTorchBtn.textContent = torchState ? "🔦 Вимкнути" : "🔦 Ліхтарик";
+    } catch (e) {
+      log(`Помилка ліхтарика: ${e.message}`, 'warn');
+    }
+  });
+
+  // 4. Вирізання зони інтересу (ROI) на Canvas
+  function prepareSourceFrame() {
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return null;
+
+    if (roiSelect.value === 'full') {
+      roiCanvas.width = vw;
+      roiCanvas.height = vh;
+      roiCtx.drawImage(video, 0, 0, vw, vh);
+      return roiCanvas;
+    }
+
+    // Вирізаємо центральні 80% ширини та 45% висоти (відповідає зеленій рамці)
+    const cropW = Math.floor(vw * 0.80);
+    const cropH = Math.floor(vh * 0.45);
+    const startX = Math.floor((vw - cropW) / 2);
+    const startY = Math.floor((vh - cropH) / 2);
+
+    roiCanvas.width = cropW;
+    roiCanvas.height = cropH;
+    roiCtx.drawImage(video, startX, startY, cropW, cropH, 0, 0, cropW, cropH);
+    return roiCanvas;
+  }
+
+  // 5. Основний цикл сканування
+  function scheduleNextScan() {
+    if (!isScanning) return;
+    scanTimer = setTimeout(() => {
+      requestAnimationFrame(scanStep);
+    }, 65);
+  }
+
+  async function scanStep() {
+    if (!isScanning) return;
+
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0) {
+      const t0 = performance.now();
+      let detected = null;
+
+      try {
+        const sourceCanvas = prepareSourceFrame();
+
+        if (currentEngine === 'native' && nativeDetector) {
+          const target = roiSelect.value === 'crop' ? sourceCanvas : video;
+          const res = await nativeDetector.detect(target);
+          if (res.length > 0) {
+            detected = { rawValue: res[0].rawValue, format: res[0].format };
+          }
+        } else if (currentEngine === 'zbar' || (currentEngine === 'native' && zbarPolyfillDetector)) {
+          const res = await zbarPolyfillDetector.detect(sourceCanvas);
+          if (res.length > 0) {
+            detected = { rawValue: res[0].rawValue, format: res[0].format };
+          }
+        } else if (currentEngine === 'zxing' && zxingReader) {
+          const luminanceSource = new window.ZXing.HTMLCanvasElementLuminanceSource(sourceCanvas);
+          const binaryBitmap = new window.ZXing.BinaryBitmap(new window.ZXing.HybridBinarizer(luminanceSource));
+          try {
+            const res = zxingReader.decodeBitmap(binaryBitmap);
+            if (res) {
+              detected = { rawValue: res.getText(), format: `ZXing_${res.getBarcodeFormat()}` };
+            }
+          } catch (notFoundErr) {
+            // Нормальна ситуація, коли в кадрі немає штрихкоду
+          }
+        } else if (currentEngine === 'html5qrcode') {
+          // Використовуємо нативний або WASM детектор з ROI-оптимізацією як у Html5-QRCode
+          const detector = nativeDetector || zbarPolyfillDetector;
+          if (!detector) await ensureDetectorsReady();
+          const activeDet = nativeDetector || zbarPolyfillDetector;
+          if (activeDet) {
+            const res = await activeDet.detect(sourceCanvas);
+            if (res.length > 0) {
+              detected = { rawValue: res[0].rawValue, format: res[0].format };
+            }
+          }
+        }
+      } catch (err) {
+        // Ігноруємо помилки окремих кадрів
+      }
+
+      const elapsed = (performance.now() - t0).toFixed(1);
+      hudPerf.textContent = `${elapsed} мс / кадр`;
+
+      if (detected && detected.rawValue) {
+        processCandidate(detected.rawValue, detected.format, elapsed);
+      } else {
+        candidateMatches = 0;
+        lastCandidate = null;
+      }
+    }
+
+    scheduleNextScan();
+  }
+
+  // 6. Валідація кількох кадрів поспіль (Multi-frame confirmation)
+  function processCandidate(rawValue, format, elapsedMs) {
+    const threshold = parseInt(confirmSelect.value, 10);
+    const isQR = String(format).toLowerCase().includes('qr');
+
+    // QR-коди мають вбудовану корекцію помилок Ріда-Соломона, їх можна приймати з 1 кадру
+    if (isQR || threshold === 1) {
+      commitSuccess(rawValue, format, elapsedMs);
+      return;
+    }
+
+    if (rawValue === lastCandidate) {
+      candidateMatches++;
+      if (candidateMatches >= threshold) {
+        commitSuccess(rawValue, format, elapsedMs);
+        candidateMatches = 0;
+      }
+    } else {
+      lastCandidate = rawValue;
+      candidateMatches = 1;
+    }
+  }
+
+  function commitSuccess(value, format, elapsedMs) {
+    totalScans++;
+    scanCounterEl.textContent = `Всього: ${totalScans}`;
+
+    resultValue.textContent = value;
+    resultMeta.innerHTML = `
+      <span>Формат: <b>${format}</b></span>
+      <span>Час: <b>${elapsedMs} мс</b></span>
+      <span>Рушій: <b>${currentEngine.toUpperCase()}</b></span>
+    `;
+
+    // Візуальний та тактильний відгук
+    viewfinder.classList.add('flash');
+    setTimeout(() => viewfinder.classList.remove('flash'), 180);
+    if (navigator.vibrate) navigator.vibrate(40);
+
+    // Оновлення історії для порівняння чи немає "обрізаних" кодів
+    const prev = scanHistory.get(value) || { count: 0 };
+    scanHistory.set(value, {
+      count: prev.count + 1,
+      format,
+      engine: currentEngine,
+      time: new Date().toLocaleTimeString()
+    });
+    renderHistory();
+  }
+
+  function renderHistory() {
+    historyList.innerHTML = '';
+    Array.from(scanHistory.entries()).reverse().forEach(([code, info]) => {
+      const row = document.createElement('div');
+      row.className = 'history-item';
+      row.innerHTML = `
+        <span><b>${code}</b> <small style="color:#9ca3af">(${info.format}, ${info.engine})</small></span>
+        <span style="color:#10b981">×${info.count}</span>
+      `;
+      historyList.appendChild(row);
+    });
+  }
+
+  // 7. Перемикання вкладок та налаштувань
+  document.querySelectorAll('.engine-tab').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      document.querySelectorAll('.engine-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentEngine = btn.dataset.engine;
+      hudEngine.textContent = `Рушій: ${currentEngine.toUpperCase()}`;
+      lastCandidate = null;
+      candidateMatches = 0;
+      log(`Перемкнуто на рушій: ${currentEngine.toUpperCase()}`, 'info');
+      await ensureDetectorsReady();
+    });
+  });
+
+  formatsSelect.addEventListener('change', () => ensureDetectorsReady());
+  resSelect.addEventListener('change', () => startCamera());
+  toggleCamBtn.addEventListener('click', () => startCamera());
+
+  clearBtn.addEventListener('click', () => {
+    scanHistory.clear();
+    totalScans = 0;
+    scanCounterEl.textContent = 'Всього: 0';
+    resultValue.textContent = 'Наведіть на штрихкод...';
+    historyList.innerHTML = '';
+  });
+
+  // Автоматичне перезавантаження сторінки при зміні коду на ПК (Live Reload через SSE)
+  try {
+    const es = new EventSource('/__live_reload');
+    es.onmessage = (ev) => {
+      if (ev.data === 'reload') {
+        log('Отримано оновлення з ПК, перезавантаження...', 'ok');
+        location.reload();
+      }
+    };
+  } catch (e) {}
+
+  window.addEventListener('DOMContentLoaded', () => {
+    startCamera();
+  });
+</script>
+</body>
+</html>
+
