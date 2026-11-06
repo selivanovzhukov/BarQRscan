@@ -36,19 +36,16 @@ function loadScriptOnce(src) {
 
 export async function getZBarPolyfillClass() {
   try {
-    const zbarMod = await import("https://esm.sh/@undecaf/barcode-detector-polyfill@0.9.21");
-    const cls =
-      zbarMod.BarcodeDetectorPolyfill ||
-      (zbarMod.default && zbarMod.default.BarcodeDetectorPolyfill) ||
-      (typeof zbarMod.default === 'function' ? zbarMod.default : null);
+    const cppMod = await import("https://cdn.jsdelivr.net/npm/barcode-detector@2.2.4/dist/es/ponyfill.min.js");
+    const cls = cppMod.BarcodeDetector || (cppMod.default && cppMod.default.BarcodeDetector);
     if (cls) return cls;
   } catch (e) {}
 
-  const cppMod = await import("https://esm.sh/barcode-detector@2.2.4/ponyfill");
+  const cppMod2 = await import("https://esm.sh/barcode-detector@2.2.4/ponyfill");
   const cppCls =
-    cppMod.BarcodeDetector ||
-    (cppMod.default && cppMod.default.BarcodeDetector) ||
-    (typeof cppMod.default === 'function' ? cppMod.default : null);
+    cppMod2.BarcodeDetector ||
+    (cppMod2.default && cppMod2.default.BarcodeDetector) ||
+    (typeof cppMod2.default === 'function' ? cppMod2.default : null);
   if (!cppCls) {
     throw new Error("Не вдалося завантажити WASM BarcodeDetector поліфіл");
   }

@@ -597,33 +597,29 @@
     if (currentEngine === 'zbar' || currentEngine === 'html5qrcode' || (currentEngine === 'native' && !nativeDetector)) {
       if (!zbarPolyfillDetector) {
         try {
-          log("Завантаження WASM BarcodeDetector (esm.sh)...", "info");
+          log("Завантаження WASM BarcodeDetector для iOS...", "info");
           let PolyfillClass = null;
 
-          // Спроба 1: @undecaf/barcode-detector-polyfill (ZBar WASM) через esm.sh
+          // Спроба 1: Офіційний W3C barcode-detector (ZXing-C++ WASM з CDN jsDelivr, де вшитий правильний шлях до .wasm)
           try {
-            const zbarMod = await import("https://esm.sh/@undecaf/barcode-detector-polyfill@0.9.21");
-            PolyfillClass =
-              zbarMod.BarcodeDetectorPolyfill ||
-              (zbarMod.default && zbarMod.default.BarcodeDetectorPolyfill) ||
-              (typeof zbarMod.default === 'function' ? zbarMod.default : null);
+            const cppMod = await import("https://cdn.jsdelivr.net/npm/barcode-detector@2.2.4/dist/es/ponyfill.min.js");
+            PolyfillClass = cppMod.BarcodeDetector || (cppMod.default && cppMod.default.BarcodeDetector);
             if (PolyfillClass) {
-              log("Модуль @undecaf/barcode-detector-polyfill (ZBar WASM) завантажено!", "ok");
+              log("Модуль ZXing-C++ WASM (barcode-detector) успішно завантажено!", "ok");
             }
           } catch (e1) {
-            log(`ZBar esm.sh помилка: ${e1.message}`, "warn");
+            log(`Попередження jsDelivr ponyfill: ${e1.message}`, "warn");
           }
 
-          // Спроба 2: Офіційний W3C barcode-detector polyfill (ZXing-C++ WASM)
+          // Спроба 2: Через esm.sh
           if (!PolyfillClass) {
-            log("Завантаження резервного ZXing-C++ WASM (barcode-detector)...", "info");
-            const cppMod = await import("https://esm.sh/barcode-detector@2.2.4/ponyfill");
+            const cppMod2 = await import("https://esm.sh/barcode-detector@2.2.4/ponyfill");
             PolyfillClass =
-              cppMod.BarcodeDetector ||
-              (cppMod.default && cppMod.default.BarcodeDetector) ||
-              (typeof cppMod.default === 'function' ? cppMod.default : null);
+              cppMod2.BarcodeDetector ||
+              (cppMod2.default && cppMod2.default.BarcodeDetector) ||
+              (typeof cppMod2.default === 'function' ? cppMod2.default : null);
             if (PolyfillClass) {
-              log("Модуль ZXing-C++ WASM (barcode-detector) завантажено!", "ok");
+              log("Модуль ZXing-C++ WASM (esm.sh) завантажено!", "ok");
             }
           }
 
@@ -636,7 +632,7 @@
             ? strictFormats.filter(f => supported.includes(f))
             : supported;
           zbarPolyfillDetector = new PolyfillClass({ formats });
-          log(`WASM BarcodeDetector активний (${formats.length} форматів)!`, "ok");
+          log(`WASM BarcodeDetector готовий (${formats.length} форматів)!`, "ok");
         } catch (zbarErr) {
           log(`Помилка ініціалізації WASM: ${zbarErr.message}`, "err");
         }
@@ -873,7 +869,12 @@
             }
           }
         }
-      } catch (err) {}
+      } catch (err) {
+        if (!window.__loggedScanErr) {
+          window.__loggedScanErr = true;
+          log(`Помилка у scanStep (${currentEngine}): ${err.message || err}`, 'err');
+        }
+      }
 
       const elapsed = (performance.now() - t0).toFixed(1);
       hudPerf.textContent = `${elapsed} мс / кадр`;
