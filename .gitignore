@@ -1,0 +1,27 @@
+# Runtime & generated data
+test-results.json
+*.log
+
+# Temporary / scrap files
+ee.txt
+gemini-code-*.html
+
+# Dependencies
+node_modules/
+
+# Environment & local settings
+.env
+.env.local
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE & Editor settings
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

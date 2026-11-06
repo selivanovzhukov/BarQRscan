@@ -104,6 +104,7 @@
       height: 100%;
       object-fit: cover;
       display: block;
+      transition: transform 0.15s ease-out;
     }
     .viewfinder {
       position: absolute;
@@ -151,27 +152,63 @@
       backdrop-filter: blur(4px);
     }
 
+    /* Панель зуму (1x - 3x) */
+    .zoom-bar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .zoom-bar input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent-blue);
+    }
+    .zoom-preset {
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #111318;
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .zoom-preset.active {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: #fff;
+    }
+
     /* Налаштування та кнопки */
     .controls-row {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
     }
     .btn {
       flex: 1;
-      min-width: 110px;
-      padding: 10px 12px;
+      min-width: 90px;
+      padding: 9px 10px;
       border-radius: 8px;
       border: 1px solid var(--border);
       background: var(--card);
       color: var(--text);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
     }
     .btn-primary {
       background: var(--accent-blue);
       border-color: var(--accent-blue);
+      color: #fff;
+    }
+    .btn-success {
+      background: #059669;
+      border-color: #10b981;
       color: #fff;
     }
     .btn-active {
@@ -311,10 +348,22 @@
     </div>
   </div>
 
+  <!-- Повзунок зуму (1x - 3x) -->
+  <div class="zoom-bar">
+    <span id="zoom-label">🔍 1.0×</span>
+    <input id="zoom-slider" type="range" min="1" max="3" step="0.1" value="1">
+    <button class="zoom-preset active" data-zoom="1">1×</button>
+    <button class="zoom-preset" data-zoom="1.5">1.5×</button>
+    <button class="zoom-preset" data-zoom="2">2×</button>
+    <button class="zoom-preset" data-zoom="3">3×</button>
+  </div>
+
   <!-- Кнопки керування -->
   <div class="controls-row">
-    <button id="toggle-cam-btn" class="btn btn-primary">🔄 Перезапустити камеру</button>
+    <button id="toggle-cam-btn" class="btn btn-primary">🔄 Камера</button>
     <button id="toggle-torch-btn" class="btn" style="display:none;">🔦 Ліхтарик</button>
+    <button id="toggle-beep-btn" class="btn">🔊 Біп: Увімк</button>
+    <button id="send-report-btn" class="btn btn-success">📤 Звіт на ПК</button>
     <button id="clear-btn" class="btn">🧹 Очистити</button>
   </div>
 
@@ -323,9 +372,18 @@
     <div class="setting-item">
       <label for="confirm-select">Multi-frame підтвердження (1D):</label>
       <select id="confirm-select">
-        <option value="1">1 кадр (Миттєво, ризик збоїв)</option>
+        <option value="1">1 кадр (Миттєво)</option>
         <option value="2" selected>2 кадри поспіль (Оптимально)</option>
         <option value="3">3 кадри поспіль (Макс. надійність)</option>
+      </select>
+    </div>
+    <div class="setting-item">
+      <label for="cooldown-select">Пауза дублікатів (Cooldown):</label>
+      <select id="cooldown-select">
+        <option value="0">Без паузи (Спам)</option>
+        <option value="1500">1.5 сек пауза</option>
+        <option value="2500" selected>2.5 сек пауза (Оптимально)</option>
+        <option value="-1">Тільки новий код</option>
       </select>
     </div>
     <div class="setting-item">
@@ -342,11 +400,11 @@
         <option value="1080">1920×1080 (Full HD - Чіткіше)</option>
       </select>
     </div>
-    <div class="setting-item">
+    <div class="setting-item" style="grid-column: span 2;">
       <label for="formats-select">Фільтр форматів:</label>
       <select id="formats-select">
-        <option value="strict" selected>Тільки основні (EAN/Code128/QR)</option>
-        <option value="all">Усі формати (Більше помилок)</option>
+        <option value="strict" selected>Тільки основні (EAN-13 / EAN-8 / Code 128 / Code 39 / UPC / ITF / QR)</option>
+        <option value="all">Усі підтримувані формати</option>
       </select>
     </div>
   </div>
@@ -354,7 +412,7 @@
   <!-- Останній результат та історія -->
   <div class="result-card">
     <div class="result-header">
-      <span>Останній зчитаний код</span>
+      <span>Останній зчитаний код (авто-відправка на ПК)</span>
       <span id="scan-counter">Всього: 0</span>
     </div>
     <div id="result-value" class="result-value">Наведіть на штрихкод...</div>
@@ -385,11 +443,18 @@
   const logPanel = document.getElementById('log-panel');
   const httpsBadge = document.getElementById('https-badge');
 
+  const zoomSlider = document.getElementById('zoom-slider');
+  const zoomLabel = document.getElementById('zoom-label');
+  const zoomPresets = document.querySelectorAll('.zoom-preset');
+
   const toggleCamBtn = document.getElementById('toggle-cam-btn');
   const toggleTorchBtn = document.getElementById('toggle-torch-btn');
+  const toggleBeepBtn = document.getElementById('toggle-beep-btn');
+  const sendReportBtn = document.getElementById('send-report-btn');
   const clearBtn = document.getElementById('clear-btn');
 
   const confirmSelect = document.getElementById('confirm-select');
+  const cooldownSelect = document.getElementById('cooldown-select');
   const roiSelect = document.getElementById('roi-select');
   const resSelect = document.getElementById('res-select');
   const formatsSelect = document.getElementById('formats-select');
@@ -402,19 +467,59 @@
   let stream = null;
   let videoTrack = null;
   let torchState = false;
+  let beepEnabled = true;
+  let currentZoom = 1.0;
+  let hardwareZoomSupported = false;
   let isScanning = false;
   let scanTimer = null;
+  let audioCtx = null;
 
   // Екземпляри детекторів
   let nativeDetector = null;
   let zbarPolyfillDetector = null;
   let zxingReader = null;
 
-  // Статистика та анти-брязкіт (multi-frame confirmation)
+  // Статистика, анти-брязкіт та анти-дублікати
   let lastCandidate = null;
   let candidateMatches = 0;
+  let lastCommittedValue = null;
+  let lastCommittedTime = 0;
   let totalScans = 0;
-  const scanHistory = new Map(); // code -> { count, format, engine, time }
+  const scanHistory = new Map(); // code -> { count, format, engine, time, avgMs }
+
+  // Відправка телеметрії на ПК (server.js)
+  function sendTelemetry(type, data) {
+    fetch('/__report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, data })
+    }).catch(() => {});
+  }
+
+  // Збереження/відновлення історії у localStorage, щоб не втрачати при LiveReload
+  function saveLocalState() {
+    try {
+      const serialized = Array.from(scanHistory.entries());
+      localStorage.setItem('scanner_test_history', JSON.stringify({
+        totalScans,
+        history: serialized
+      }));
+    } catch (e) {}
+  }
+
+  function restoreLocalState() {
+    try {
+      const raw = localStorage.getItem('scanner_test_history');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.history)) {
+        totalScans = parsed.totalScans || 0;
+        scanCounterEl.textContent = `Всього: ${totalScans}`;
+        parsed.history.forEach(([k, v]) => scanHistory.set(k, v));
+        renderHistory();
+      }
+    } catch (e) {}
+  }
 
   function log(msg, type = 'info') {
     const el = document.createElement('div');
@@ -424,6 +529,31 @@
     el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
     logPanel.appendChild(el);
     logPanel.scrollTop = logPanel.scrollHeight;
+    sendTelemetry('log', { level: type, message: msg });
+  }
+
+  // Звуковий сигнал Web Audio API
+  function playBeep(freq = 1850, durationMs = 75) {
+    if (!beepEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!audioCtx) audioCtx = new AudioCtx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + durationMs / 1000);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + durationMs / 1000);
+    } catch (e) {}
   }
 
   // 1. Перевірка HTTPS / Secure Context
@@ -463,18 +593,53 @@
       }
     }
 
-    // B) ZBar WASM (@undecaf/barcode-detector-polyfill)
-    if (currentEngine === 'zbar' || (currentEngine === 'native' && !nativeDetector)) {
+    // B) WASM Polyfill для iOS Safari та вкладки ZBar WASM
+    if (currentEngine === 'zbar' || currentEngine === 'html5qrcode' || (currentEngine === 'native' && !nativeDetector)) {
       if (!zbarPolyfillDetector) {
-        log("Завантаження ZBar WASM (@undecaf/barcode-detector-polyfill)...", "info");
-        const mod = await import("https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.min.js");
-        const PolyfillClass = mod.BarcodeDetectorPolyfill;
-        const supported = await PolyfillClass.getSupportedFormats();
-        const formats = formatsSelect.value === 'strict'
-          ? strictFormats.filter(f => supported.includes(f))
-          : supported;
-        zbarPolyfillDetector = new PolyfillClass({ formats });
-        log("ZBar WASM готовий до роботи!", "ok");
+        try {
+          log("Завантаження WASM BarcodeDetector (esm.sh)...", "info");
+          let PolyfillClass = null;
+
+          // Спроба 1: @undecaf/barcode-detector-polyfill (ZBar WASM) через esm.sh
+          try {
+            const zbarMod = await import("https://esm.sh/@undecaf/barcode-detector-polyfill@0.9.21");
+            PolyfillClass =
+              zbarMod.BarcodeDetectorPolyfill ||
+              (zbarMod.default && zbarMod.default.BarcodeDetectorPolyfill) ||
+              (typeof zbarMod.default === 'function' ? zbarMod.default : null);
+            if (PolyfillClass) {
+              log("Модуль @undecaf/barcode-detector-polyfill (ZBar WASM) завантажено!", "ok");
+            }
+          } catch (e1) {
+            log(`ZBar esm.sh помилка: ${e1.message}`, "warn");
+          }
+
+          // Спроба 2: Офіційний W3C barcode-detector polyfill (ZXing-C++ WASM)
+          if (!PolyfillClass) {
+            log("Завантаження резервного ZXing-C++ WASM (barcode-detector)...", "info");
+            const cppMod = await import("https://esm.sh/barcode-detector@2.2.4/ponyfill");
+            PolyfillClass =
+              cppMod.BarcodeDetector ||
+              (cppMod.default && cppMod.default.BarcodeDetector) ||
+              (typeof cppMod.default === 'function' ? cppMod.default : null);
+            if (PolyfillClass) {
+              log("Модуль ZXing-C++ WASM (barcode-detector) завантажено!", "ok");
+            }
+          }
+
+          if (!PolyfillClass) {
+            throw new Error("Жоден WASM-поліфіл не повернув клас детектора");
+          }
+
+          const supported = await PolyfillClass.getSupportedFormats();
+          const formats = formatsSelect.value === 'strict'
+            ? strictFormats.filter(f => supported.includes(f))
+            : supported;
+          zbarPolyfillDetector = new PolyfillClass({ formats });
+          log(`WASM BarcodeDetector активний (${formats.length} форматів)!`, "ok");
+        } catch (zbarErr) {
+          log(`Помилка ініціалізації WASM: ${zbarErr.message}`, "err");
+        }
       }
     }
 
@@ -502,13 +667,13 @@
       log(`ZXing ініціалізовано (TRY_HARDER + ${formatsSelect.value === 'strict' ? 'обмежені формати' : 'всі формати'})`, 'ok');
     }
 
-    // D) Html5-QRCode (використовуємо внутрішній декодер по canvas/image або BarcodeDetector)
+    // D) Html5-QRCode
     if (currentEngine === 'html5qrcode') {
       log("Html5-QRCode готовий (режим декодування кадру)", "ok");
     }
   }
 
-  // 3. Запуск камери
+  // 3. Запуск камери та налаштування зуму/ліхтарика
   async function startCamera() {
     if (!checkEnvironment()) return;
     stopCamera();
@@ -534,10 +699,19 @@
 
       videoTrack = stream.getVideoTracks()[0];
       const settings = videoTrack.getSettings ? videoTrack.getSettings() : {};
-      log(`Камера активна: ${settings.width || '?'}x${settings.height || '?'}`, 'ok');
+      const caps = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+      hardwareZoomSupported = Boolean(caps.zoom);
 
-      setupTorch(videoTrack);
-      await ensureDetectorsReady();
+      log(`Камера активна: ${settings.width || '?'}x${settings.height || '?'} | HW Zoom: ${hardwareZoomSupported ? 'Так' : 'Цифровий'}`, 'ok');
+
+      setupTorch(caps);
+      await applyZoom(currentZoom);
+
+      try {
+        await ensureDetectorsReady();
+      } catch (detErr) {
+        log(`Попередження детектора: ${detErr.message}`, 'warn');
+      }
 
       isScanning = true;
       scheduleNextScan();
@@ -555,14 +729,41 @@
     }
   }
 
-  function setupTorch(track) {
-    const caps = track.getCapabilities ? track.getCapabilities() : {};
-    if (caps.torch) {
+  function setupTorch(caps) {
+    if (caps && caps.torch) {
       toggleTorchBtn.style.display = 'inline-block';
     } else {
       toggleTorchBtn.style.display = 'none';
     }
   }
+
+  async function applyZoom(zoomValue) {
+    currentZoom = Math.max(1, Math.min(3, parseFloat(zoomValue) || 1));
+    zoomSlider.value = String(currentZoom);
+    zoomLabel.textContent = `🔍 ${currentZoom.toFixed(1)}×`;
+
+    zoomPresets.forEach(btn => {
+      btn.classList.toggle('active', Math.abs(parseFloat(btn.dataset.zoom) - currentZoom) < 0.05);
+    });
+
+    if (videoTrack && hardwareZoomSupported) {
+      try {
+        const caps = videoTrack.getCapabilities();
+        const clamped = Math.max(caps.zoom.min || 1, Math.min(caps.zoom.max || 3, currentZoom));
+        await videoTrack.applyConstraints({ advanced: [{ zoom: clamped }] });
+        video.style.transform = '';
+        return;
+      } catch (e) {}
+    }
+
+    // Цифровий зум, якщо камера не надає hardware zoom constraint
+    video.style.transform = currentZoom > 1 ? `scale(${currentZoom})` : '';
+  }
+
+  zoomSlider.addEventListener('input', (e) => applyZoom(e.target.value));
+  zoomPresets.forEach(btn => {
+    btn.addEventListener('click', () => applyZoom(btn.dataset.zoom));
+  });
 
   toggleTorchBtn.addEventListener('click', async () => {
     if (!videoTrack) return;
@@ -576,22 +777,45 @@
     }
   });
 
-  // 4. Вирізання зони інтересу (ROI) на Canvas
+  toggleBeepBtn.addEventListener('click', () => {
+    beepEnabled = !beepEnabled;
+    toggleBeepBtn.textContent = beepEnabled ? "🔊 Біп: Увімк" : "🔇 Біп: Вимк";
+    if (beepEnabled) playBeep();
+  });
+
+  sendReportBtn.addEventListener('click', () => {
+    const historyArr = Array.from(scanHistory.entries()).map(([code, info]) => ({ code, ...info }));
+    sendTelemetry('summary', {
+      totalScans,
+      currentEngine,
+      zoom: currentZoom,
+      roi: roiSelect.value,
+      resolution: resSelect.value,
+      confirmFrames: confirmSelect.value,
+      history: historyArr
+    });
+    log(`Звіт успішно надіслано на ПК (${historyArr.length} кодів)!`, 'ok');
+  });
+
+  // 4. Вирізання зони інтересу (ROI) на Canvas (з урахуванням цифрового зуму)
   function prepareSourceFrame() {
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     if (!vw || !vh) return null;
 
-    if (roiSelect.value === 'full') {
+    const digitalZoom = (!hardwareZoomSupported && currentZoom > 1) ? currentZoom : 1;
+
+    if (roiSelect.value === 'full' && digitalZoom === 1) {
       roiCanvas.width = vw;
       roiCanvas.height = vh;
       roiCtx.drawImage(video, 0, 0, vw, vh);
       return roiCanvas;
     }
 
-    // Вирізаємо центральні 80% ширини та 45% висоти (відповідає зеленій рамці)
-    const cropW = Math.floor(vw * 0.80);
-    const cropH = Math.floor(vh * 0.45);
+    const baseW = roiSelect.value === 'full' ? 1.0 : 0.80;
+    const baseH = roiSelect.value === 'full' ? 1.0 : 0.45;
+    const cropW = Math.max(64, Math.floor((vw * baseW) / digitalZoom));
+    const cropH = Math.max(64, Math.floor((vh * baseH) / digitalZoom));
     const startX = Math.floor((vw - cropW) / 2);
     const startY = Math.floor((vh - cropH) / 2);
 
@@ -606,7 +830,7 @@
     if (!isScanning) return;
     scanTimer = setTimeout(() => {
       requestAnimationFrame(scanStep);
-    }, 65);
+    }, 60);
   }
 
   async function scanStep() {
@@ -620,7 +844,8 @@
         const sourceCanvas = prepareSourceFrame();
 
         if (currentEngine === 'native' && nativeDetector) {
-          const target = roiSelect.value === 'crop' ? sourceCanvas : video;
+          const useDirectVideo = roiSelect.value === 'full' && (hardwareZoomSupported || currentZoom === 1);
+          const target = useDirectVideo ? video : sourceCanvas;
           const res = await nativeDetector.detect(target);
           if (res.length > 0) {
             detected = { rawValue: res[0].rawValue, format: res[0].format };
@@ -638,13 +863,8 @@
             if (res) {
               detected = { rawValue: res.getText(), format: `ZXing_${res.getBarcodeFormat()}` };
             }
-          } catch (notFoundErr) {
-            // Нормальна ситуація, коли в кадрі немає штрихкоду
-          }
+          } catch (notFoundErr) {}
         } else if (currentEngine === 'html5qrcode') {
-          // Використовуємо нативний або WASM детектор з ROI-оптимізацією як у Html5-QRCode
-          const detector = nativeDetector || zbarPolyfillDetector;
-          if (!detector) await ensureDetectorsReady();
           const activeDet = nativeDetector || zbarPolyfillDetector;
           if (activeDet) {
             const res = await activeDet.detect(sourceCanvas);
@@ -653,9 +873,7 @@
             }
           }
         }
-      } catch (err) {
-        // Ігноруємо помилки окремих кадрів
-      }
+      } catch (err) {}
 
       const elapsed = (performance.now() - t0).toFixed(1);
       hudPerf.textContent = `${elapsed} мс / кадр`;
@@ -671,27 +889,42 @@
     scheduleNextScan();
   }
 
-  // 6. Валідація кількох кадрів поспіль (Multi-frame confirmation)
+  // 6. Валідація кількох кадрів поспіль (Multi-frame confirmation) + Cooldown дублікатів
   function processCandidate(rawValue, format, elapsedMs) {
     const threshold = parseInt(confirmSelect.value, 10);
     const isQR = String(format).toLowerCase().includes('qr');
 
-    // QR-коди мають вбудовану корекцію помилок Ріда-Соломона, їх можна приймати з 1 кадру
     if (isQR || threshold === 1) {
-      commitSuccess(rawValue, format, elapsedMs);
+      checkCooldownAndCommit(rawValue, format, elapsedMs);
       return;
     }
 
     if (rawValue === lastCandidate) {
       candidateMatches++;
       if (candidateMatches >= threshold) {
-        commitSuccess(rawValue, format, elapsedMs);
         candidateMatches = 0;
+        checkCooldownAndCommit(rawValue, format, elapsedMs);
       }
     } else {
       lastCandidate = rawValue;
       candidateMatches = 1;
     }
+  }
+
+  function checkCooldownAndCommit(value, format, elapsedMs) {
+    const cooldownMode = parseInt(cooldownSelect.value, 10);
+    const now = Date.now();
+
+    if (cooldownMode === -1 && value === lastCommittedValue) {
+      return; // Тільки новий код
+    }
+    if (cooldownMode > 0 && value === lastCommittedValue && (now - lastCommittedTime) < cooldownMode) {
+      return; // Ще триває пауза для цього ж коду
+    }
+
+    lastCommittedValue = value;
+    lastCommittedTime = now;
+    commitSuccess(value, format, elapsedMs);
   }
 
   function commitSuccess(value, format, elapsedMs) {
@@ -705,20 +938,35 @@
       <span>Рушій: <b>${currentEngine.toUpperCase()}</b></span>
     `;
 
-    // Візуальний та тактильний відгук
+    // Звук, спалах рамки та вібрація
+    playBeep();
     viewfinder.classList.add('flash');
     setTimeout(() => viewfinder.classList.remove('flash'), 180);
     if (navigator.vibrate) navigator.vibrate(40);
 
-    // Оновлення історії для порівняння чи немає "обрізаних" кодів
+    // Оновлення історії
     const prev = scanHistory.get(value) || { count: 0 };
     scanHistory.set(value, {
       count: prev.count + 1,
       format,
       engine: currentEngine,
+      lastElapsedMs: elapsedMs,
       time: new Date().toLocaleTimeString()
     });
+    saveLocalState();
     renderHistory();
+
+    // Миттєво відправляємо результат сканування на ПК (server.js)
+    sendTelemetry('scan', {
+      value,
+      format,
+      engine: currentEngine,
+      elapsedMs: Number(elapsedMs),
+      zoom: currentZoom,
+      roi: roiSelect.value,
+      resolution: resSelect.value,
+      confirmFrames: Number(confirmSelect.value)
+    });
   }
 
   function renderHistory() {
@@ -727,7 +975,7 @@
       const row = document.createElement('div');
       row.className = 'history-item';
       row.innerHTML = `
-        <span><b>${code}</b> <small style="color:#9ca3af">(${info.format}, ${info.engine})</small></span>
+        <span><b>${code}</b> <small style="color:#9ca3af">(${info.format}, ${info.engine}, ${info.lastElapsedMs || '?'}мс)</small></span>
         <span style="color:#10b981">×${info.count}</span>
       `;
       historyList.appendChild(row);
@@ -755,6 +1003,8 @@
   clearBtn.addEventListener('click', () => {
     scanHistory.clear();
     totalScans = 0;
+    lastCommittedValue = null;
+    localStorage.removeItem('scanner_test_history');
     scanCounterEl.textContent = 'Всього: 0';
     resultValue.textContent = 'Наведіть на штрихкод...';
     historyList.innerHTML = '';
@@ -772,9 +1022,9 @@
   } catch (e) {}
 
   window.addEventListener('DOMContentLoaded', () => {
+    restoreLocalState();
     startCamera();
   });
 </script>
 </body>
 </html>
-
