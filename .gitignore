@@ -7,6 +7,11 @@ test-results.json
 ee.txt
 gemini-code-*.html
 
+# Local test bench & dev server
+index.html
+server.js
+start-server.bat
+
 # Dependencies
 node_modules/
 
@@ -26,3 +31,8 @@ desktop.ini
 *.ntvs*
 *.njsproj
 *.sln
+
+# Agent & notes
+.agents/
+GEMINI.md
+web_app.md
