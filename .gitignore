@@ -1,4 +1,5 @@
 # Runtime & generated data
+.cert/
 test-results.json
 *.log
 

@@ -1,0 +1,35 @@
+{
+  "name": "universal-barcode-scanner-sdk",
+  "version": "1.0.0",
+  "description": "Універсальний SDK сканування штрихкодів (Code-128, EAN-13, UPC) та QR-кодів для Android, iOS (Safari), Windows та macOS (ML Kit + ZXing-C++ WASM 1D Strip)",
+  "type": "module",
+  "main": "./barcode-scanner.js",
+  "module": "./barcode-scanner.js",
+  "types": "./barcode-scanner.d.ts",
+  "exports": {
+    ".": {
+      "types": "./barcode-scanner.d.ts",
+      "import": "./barcode-scanner.js",
+      "default": "./barcode-scanner.js"
+    }
+  },
+  "files": [
+    "barcode-scanner.js",
+    "barcode-scanner.d.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "barcode",
+    "qr-code",
+    "code-128",
+    "ean-13",
+    "ios-safari",
+    "android",
+    "zxing-wasm",
+    "barcode-detector"
+  ],
+  "license": "MIT"
+}
