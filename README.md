@@ -1,123 +1,179 @@
-# Universal Barcode & QR Scanner SDK (`v1.0.0`)
+# bar-qr-scan
 
-Універсальна бібліотека для швидкого та надійного сканування **1D-штрихкодів (`Code-128`, `EAN-13`, `EAN-8`, `UPC-A`, `Code-39`, `ITF`)** та **2D `QR-кодів`** на всіх платформах:
-- **Android (Chrome, Samsung Internet, Firefox):** апаратний прискорювач Google ML Kit (`BarcodeDetector`) із автоматичним самовідновленням (`Self-Healing`) на WASM, якщо системний сервіс недоступний.
-- **iOS (iPhone / iPad Safari та WebKit):** високошвидкісний C++20 `ZXing-WASM` + чиста 1D-смужка з білими полями (`Quiet Zone 24px`) і авто-вибором мульти-камери з макрофокусом (`19–28 мс` на кадр).
-- **Windows та macOS лептопи:** підтримка вбудованих і USB веб-камер з фіксованим фокусом завдяки двомасштабному QR-детектору (`Macro 1:1` + `Auto-Levels` контраст).
-- **Розумне керування камерами:** повне відсікання фронтальних (селфі) камер на смартфонах/планшетах та автоматичний пошук заднього об'єктива з фізичним ліхтариком (`🔦`).
+High-performance, zero-dependency universal 1D barcode and QR scanner SDK for modern Web applications.
+
+Works seamlessly across:
+- **Android (Chrome, Samsung Internet, Firefox)**: Hardware-accelerated BarcodeDetector (Google ML Kit) with automatic runtime self-healing failover to ZXing-C++ WASM.
+- **iOS (iPhone & iPad Safari)**: High-speed C++20 ZXing-WASM with horizontal Clean 1D Strip and 24px white quiet-zone padding (15-28 ms per frame).
+- **Windows & macOS Laptops**: Built-in fixed-focus and USB webcams supported through a dual-scale QR detector (Macro 1:1 center crop + contrast Auto-Levels).
+- **Smart Camera Management**: Automatically filters out selfie cameras on smartphones and picks the rear camera supporting flashlight/macro.
 
 ---
 
-## 1. Підключення
+## Supported Formats
 
-Скопіюйте файли [`barcode-scanner.js`](./barcode-scanner.js) та [`barcode-scanner.d.ts`](./barcode-scanner.d.ts) у свій проєкт або встановіть пакет локально:
+- **1D Barcodes**: `Code-128`, `EAN-13`, `EAN-8`, `UPC-A`, `UPC-E`, `Code-39`, `ITF`
+- **2D Codes**: `QR Code`
+
+---
+
+## Installation
 
 ```bash
-npm install ./шлях-до-папки-sdk
+npm install bar-qr-scan
+```
+
+Or via CDN / direct ESM import:
+
+```html
+<script type="module">
+  import { BarQRScanner } from 'https://cdn.jsdelivr.net/npm/bar-qr-scan/barcode-scanner.js';
+</script>
 ```
 
 ---
 
-## 2. Варіант А — Готовий UI-віджет у 1 рядок (`.mount()`)
+## Quick Start (One-Line UI Widget)
 
-Найшвидший спосіб додати сканер із готовою рамкою прицілу, повзунком зуму (`1×–3×`) та кнопками (`🔄 Камера`, `♻️ Перезапуск`, `🔦 Ліхтарик`):
+Mount a complete scanner widget with a responsive viewport, target reticle, zoom slider (1.0x - 3.0x), and camera controls:
 
 ```html
-<div id="scanner-box"></div>
+<div id="scanner-container"></div>
 
 <script type="module">
-  import { UniversalBarcodeScanner } from './barcode-scanner.js';
+  import { BarQRScanner } from 'bar-qr-scan';
 
-  const scanner = await UniversalBarcodeScanner.mount('#scanner-box', {
+  const scanner = await BarQRScanner.mount('#scanner-container', {
     duplicateCooldownMs: 1500,
     onScan: ({ value, format, engine, elapsedMs }) => {
-      console.log(`Зчитано: ${value} (${format}) за ${elapsedMs} мс [${engine}]`);
+      console.log(`Scanned: ${value} (${format}) in ${elapsedMs}ms [${engine}]`);
     }
   });
 
-  // Коли сканер більше не потрібен:
+  // When finished:
   // scanner.destroy();
 </script>
 ```
 
 ---
 
-## 3. Варіант Б — Headless API (Власний інтерфейс / Кастомна верстка)
+## Headless API (Custom UI)
 
-Якщо у вашому застосунку власний дизайн вікна камери та кнопок:
+Bind the scanner engine to your own `<video>` element and design your own buttons:
 
 ```html
-<video id="my-video" playsinline autoplay muted></video>
-<button id="btn-switch">🔄 Змінити камеру</button>
-<button id="btn-refresh">♻️ Оновити фокус</button>
-<button id="btn-torch">🔦 Ліхтарик</button>
+<video id="camera-stream" playsinline autoplay muted></video>
+<button id="btn-switch">Switch Camera</button>
+<button id="btn-reset">Reset</button>
+<button id="btn-torch">Torch</button>
 
 <script type="module">
-  import { UniversalBarcodeScanner } from './barcode-scanner.js';
+  import { BarQRScanner } from 'bar-qr-scan';
 
-  const scanner = new UniversalBarcodeScanner({
-    videoElement: document.getElementById('my-video'),
-    confirmFrames: 2,          // 1 кадр для QR/Code-128 (завдяки контрольній сумі), 2 для EAN
-    duplicateCooldownMs: 2000, // Пауза між дублікатами (мс)
+  const scanner = new BarQRScanner({
+    videoElement: document.getElementById('camera-stream'),
+    confirmFrames: 2,          // 1 frame for QR / checksum Code-128; 2 frames for retail EAN
+    duplicateCooldownMs: 2000, // Cooldown in ms between duplicate reads
     beepOnScan: true,
     vibrateOnScan: true,
     onScan: ({ value, format, engine, elapsedMs }) => {
-      console.log('Код:', value, format, elapsedMs);
+      console.log('Result:', value, format, elapsedMs);
     },
-    onStatus: (msg) => console.info('[Scanner]', msg),
+    onStatus: (msg) => console.info('[Scanner Status]', msg),
     onError: (err) => console.error('[Scanner Error]', err)
   });
 
-  // Старт сканера (автоматично обере задню камеру з ліхтариком і 720p/1080p)
+  // Start scanning (auto-selects best rear camera with torch support)
   const info = await scanner.start();
-  console.log('Активний рушій:', info.engine, 'Підтримка ліхтарика:', Boolean(info.capabilities.torch));
+  console.log('Engine:', info.engine, 'Torch supported:', Boolean(info.capabilities.torch));
 
-  // Керування:
+  // Controls:
   document.getElementById('btn-switch').onclick = () => scanner.switchRearCamera();
-  document.getElementById('btn-refresh').onclick = () => scanner.refreshCamera();
+  document.getElementById('btn-reset').onclick = () => scanner.refreshCamera();
   document.getElementById('btn-torch').onclick = () => scanner.setTorch(!scanner.torchEnabled);
 </script>
 ```
 
 ---
 
-## 4. Приклад використання у React
+## React / Next.js Integration
 
 ```tsx
-import { useEffect, useRef } from 'react';
-import { UniversalBarcodeScanner, ScanResult } from './barcode-scanner';
+import React, { useEffect, useRef } from 'react';
+import { BarQRScanner, ScanResult } from 'bar-qr-scan';
 
-export function BarcodeScannerModal({ onDetected }: { onDetected: (res: ScanResult) => void }) {
+interface Props {
+  onDetected: (result: ScanResult) => void;
+}
+
+export const BarcodeScannerModal: React.FC<Props> = ({ onDetected }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let instance: UniversalBarcodeScanner | null = null;
+    let scanner: BarQRScanner | null = null;
+
     if (containerRef.current) {
-      UniversalBarcodeScanner.mount(containerRef.current, {
+      BarQRScanner.mount(containerRef.current, {
         onScan: onDetected
-      }).then((sc) => {
-        instance = sc;
+      }).then((instance) => {
+        scanner = instance;
       });
     }
+
     return () => {
-      instance?.destroy?.();
+      if (scanner) scanner.destroy();
     };
   }, [onDetected]);
 
-  return <div ref={containerRef} />;
-}
+  return <div ref={containerRef} style={{ width: '100%', maxWidth: '480px' }} />;
+};
 ```
 
 ---
 
-## 5. Офлайн / Локальний хостинг WASM (без зовнішніх CDN)
+## Configuration Options
 
-За замовчуванням на пристроях без апаратного `BarcodeDetector` (iOS Safari, Windows, Firefox) SDK автоматично завантажує `zxing-wasm@2.1.2` із jsDelivr CDN. Якщо ваш застосунок працює в закритій локальній мережі без інтернету, покладіть файли `index.js` та `zxing_reader.wasm` із пакета `zxing-wasm` на свій сервер і передайте шляхи:
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `videoElement` | `HTMLVideoElement` | `null` | Target video element (required for Headless mode). |
+| `onScan` | `function` | `()` | Callback invoked with `{ value, format, engine, elapsedMs }`. |
+| `onError` | `function` | `console.error` | Error handler callback. |
+| `onStatus` | `function` | `console.log` | Diagnostic status updates (e.g. engine switches). |
+| `formats` | `Array` | All formats | Array of formats: `'code_128'`, `'ean_13'`, `'qr_code'`, etc. |
+| `confirmFrames` | `number` | `2` | Required consecutive matching frames (1 for QR and Code-128). |
+| `duplicateCooldownMs`| `number` | `2000` | Minimum delay before re-scanning the same code (in ms). |
+| `beepOnScan` | `boolean` | `true` | Plays a brief 1760 Hz audio chime on detection. |
+| `vibrateOnScan` | `boolean` | `true` | Triggers a 50 ms haptic pulse on mobile devices. |
+| `roi` | `object` | `{ widthRatio: 0.94, heightRatio: 0.42 }` | Crop region for performance and aiming. |
+| `forceWasm` | `boolean` | `false` | Force ZXing-C++ WASM even if native BarcodeDetector exists. |
+| `wasmIifeUrl` | `string` | jsDelivr CDN | Custom URL to the zxing-wasm IIFE script bundle. |
+| `wasmBinaryDir` | `string` | jsDelivr CDN | Custom directory containing the `zxing_reader.wasm` binary. |
 
-```js
-const scanner = await UniversalBarcodeScanner.mount('#scanner-box', {
-  wasmIifeUrl: '/assets/zxing/iife/reader/index.js',
-  wasmBinaryDir: '/assets/zxing/reader/',
-  onScan: (res) => console.log(res.value)
-});
-```
+---
+
+## Offline / Self-Hosted WASM
+
+For air-gapped environments or intranet applications without internet access:
+
+1. Download `index.js` and `zxing_reader.wasm` from `zxing-wasm@2.1.2`.
+2. Host them in your public static assets folder:
+   ```
+   public/
+     vendor/
+       zxing/
+         index.js
+         zxing_reader.wasm
+   ```
+3. Point the scanner to your local endpoints:
+   ```js
+   const scanner = new BarQRScanner({
+     wasmIifeUrl: '/vendor/zxing/index.js',
+     wasmBinaryDir: '/vendor/zxing/'
+   });
+   ```
+
+---
+
+## License
+
+MIT © [fetzer](mailto:v5oc9e5mk@mozmail.com)

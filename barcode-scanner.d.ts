@@ -21,72 +21,65 @@ export interface ROIConfig {
 }
 
 export interface ScannerOptions {
-  /** Елемент <video> (обов'язковий для Headless-режиму, створюється автоматично у .mount()) */
+  /** Target <video> element (required for Headless mode, automatically created by .mount()) */
   videoElement?: HTMLVideoElement;
-  /** Колбек при успішному скануванні штрихкоду або QR-коду */
+  /** Callback fired on successful barcode or QR detection */
   onScan?: (result: ScanResult) => void;
-  /** Колбек помилок камери/ініціалізації */
+  /** Error callback for camera or initialization issues */
   onError?: (error: Error) => void;
-  /** Інформаційний колбек статусу (обраний рушій, авто-перехід на WASM тощо) */
+  /** Status callback for diagnostics and engine switching */
   onStatus?: (message: string) => void;
-  /** Список форматів для декодування */
+  /** List of formats to detect */
   formats?: BarcodeFormat[];
-  /** Кількість кадрів підтвердження (за замовчуванням 2; для QR та Code-128 з контрольною сумою — миттєво 1) */
+  /** Confirmation frame count (default: 2; instant 1 for QR and checksum-verified Code-128) */
   confirmFrames?: number;
-  /** Пауза між повторними спрацьовуваннями одного й того ж коду, мс (за замовчуванням 2000) */
+  /** Cooldown between scanning identical values in milliseconds (default: 2000) */
   duplicateCooldownMs?: number;
-  /** Звуковий сигнал при скануванні (за замовчуванням true) */
+  /** Audio beep on successful scan (default: true) */
   beepOnScan?: boolean;
-  /** Вібрація при скануванні (за замовчуванням true) */
+  /** Haptic vibration on scan when supported (default: true) */
   vibrateOnScan?: boolean;
-  /** Налаштування зони інтересу (ROI) або null для всього кадру */
+  /** Region of interest (ROI) ratios, or null for full frame */
   roi?: ROIConfig | null;
-  /** Власний URL до IIFE-бандлу zxing-wasm (для офлайн-хостингу) */
+  /** Custom URL for the zxing-wasm IIFE bundle (for offline/self-hosted setups) */
   wasmIifeUrl?: string;
-  /** Власна папка з файлом zxing_reader.wasm (для офлайн-хостингу) */
+  /** Custom directory containing zxing_reader.wasm (for offline/self-hosted setups) */
   wasmBinaryDir?: string;
-  /** Примусово використовувати ZXing-C++ WASM навіть за наявності BarcodeDetector */
+  /** Force ZXing-C++ WASM engine even if hardware BarcodeDetector is available */
   forceWasm?: boolean;
 }
 
 export interface MountOptions extends ScannerOptions {
-  /** Висота вікна камери у пікселях (за замовчуванням 280) */
+  /** Viewport height in pixels for the mounted UI widget (default: 280) */
   heightPx?: number;
-  /** Автоматично запускати камеру після монтування (за замовчуванням true) */
-  autoStart?: boolean;
 }
 
-export interface StartOptions {
-  widthIdeal?: number;
-  heightIdeal?: number;
-  deviceId?: string;
-}
-
-export interface StartResult {
-  engine: string;
+export interface StartInfo {
+  engine: 'native' | 'wasm-zxing-1d';
+  deviceId: string;
+  label: string;
   capabilities: MediaTrackCapabilities;
   settings: MediaTrackSettings;
 }
 
-export declare class UniversalBarcodeScanner {
+export class BarQRScanner {
   constructor(options?: ScannerOptions);
-  initDetector(): Promise<void>;
-  getAvailableCameras(): Promise<MediaDeviceInfo[]>;
-  start(options?: StartOptions): Promise<StartResult | null>;
+  start(): Promise<StartInfo>;
   stop(): void;
-  refreshCamera(): Promise<StartResult | null>;
-  switchRearCamera(): Promise<StartResult | null>;
-  getCapabilities(): MediaTrackCapabilities;
+  destroy(): void;
+  switchRearCamera(): Promise<string>;
+  refreshCamera(): Promise<void>;
   setTorch(enabled: boolean): Promise<boolean>;
-  setZoom(zoomFactor: number): Promise<{ mode: 'hardware' | 'digital'; zoom: number }>;
-  playBeep(freq?: number, durationMs?: number): void;
-  destroy?: () => void;
+  setSoftwareZoom(factor: number): void;
+  get activeEngine(): 'native' | 'wasm-zxing-1d' | null;
+  get torchEnabled(): boolean;
 
   static mount(
     containerOrSelector: HTMLElement | string,
     options?: MountOptions
-  ): Promise<UniversalBarcodeScanner>;
+  ): Promise<BarQRScanner>;
 }
 
-export { UniversalBarcodeScanner as MobileBarcodeScanner };
-export default UniversalBarcodeScanner;
+export { BarQRScanner as UniversalBarcodeScanner };
+export { BarQRScanner as MobileBarcodeScanner };
+export default BarQRScanner;
