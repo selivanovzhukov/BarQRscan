@@ -11,6 +11,7 @@ gemini-code-*.html
 index.html
 server.js
 start-server.bat
+sound-tester.html
 
 # Dependencies
 node_modules/

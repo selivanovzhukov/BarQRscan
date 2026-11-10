@@ -1,6 +1,6 @@
 {
   "name": "bar-qr-scan",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "High-performance universal 1D barcode and QR scanner SDK for Web, Android, iOS Safari, Windows and macOS (BarcodeDetector ML Kit + ZXing-C++ WASM Clean 1D Strip)",
   "type": "module",
   "main": "./barcode-scanner.js",

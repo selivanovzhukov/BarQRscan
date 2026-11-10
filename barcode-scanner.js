@@ -15,6 +15,152 @@
 const DEFAULT_ZXING_IIFE = "https://cdn.jsdelivr.net/npm/zxing-wasm@2.1.2/dist/iife/reader/index.js";
 const DEFAULT_ZXING_WASM_DIR = "https://cdn.jsdelivr.net/npm/zxing-wasm@2.1.2/dist/reader/";
 
+let sharedAudioCtx = null;
+
+export const SOUND_PRESETS = {
+  pos: (ctx, now) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, now);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.15);
+  },
+  chirp: (ctx, now) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1200, now);
+    osc.frequency.exponentialRampToValueAtTime(1760, now + 0.08);
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.09);
+  },
+  industrial: (ctx, now) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(2400, now);
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.06);
+  },
+  bell: (ctx, now) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1046.5, now);
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.22);
+  },
+  double: (ctx, now) => {
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(880, now);
+    gain1.gain.setValueAtTime(0.25, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.05);
+
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1320, now + 0.07);
+    gain2.gain.setValueAtTime(0.25, now + 0.07);
+    gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.07);
+    osc2.stop(now + 0.14);
+  },
+  chord: (ctx, now) => {
+    const notes = [523.25, 659.25, 783.99];
+    notes.forEach(f => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, now);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.22);
+    });
+  }
+};
+
+function playCustomTone(ctx, now, config) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const freq = typeof config.frequency === 'number' ? config.frequency : 880;
+  const dur = typeof config.duration === 'number' ? config.duration : 0.15;
+  const vol = typeof config.volume === 'number' ? Math.max(0, Math.min(1, config.volume)) : 0.3;
+  osc.type = config.type || 'sine';
+  osc.frequency.setValueAtTime(freq, now);
+  gain.gain.setValueAtTime(vol, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + dur);
+}
+
+/**
+ * Returns a shared AudioContext singleton to comply with browser resource limits (e.g. max 4-6 contexts in Safari).
+ */
+function getSharedAudioContext() {
+  if (typeof window === 'undefined') return null;
+  if (!sharedAudioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      sharedAudioCtx = new AudioContextClass();
+    }
+  }
+  return sharedAudioCtx;
+}
+
+/**
+ * Unlocks Web Audio API on mobile browsers (especially iOS Safari) by resuming the suspended AudioContext
+ * during an active user interaction event.
+ */
+export function unlockAudio() {
+  const ctx = getSharedAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+  return ctx;
+}
+
+// Automatically register a one-time gesture listener on first touch/click to unlock audio on iOS WebKit
+if (typeof window !== 'undefined') {
+  const unlockEvents = ['touchstart', 'touchend', 'pointerdown', 'keydown'];
+  const onFirstInteraction = () => {
+    unlockAudio();
+    unlockEvents.forEach(evt => window.removeEventListener(evt, onFirstInteraction, true));
+  };
+  unlockEvents.forEach(evt => {
+    window.addEventListener(evt, onFirstInteraction, { capture: true, once: true, passive: true });
+  });
+}
+
 function loadScriptOnce(src) {
   return new Promise((resolve, reject) => {
     const existing = document.querySelector(`script[src="${src}"]`);
@@ -137,6 +283,7 @@ export class BarQRScanner {
     this.confirmFrames = typeof options.confirmFrames === 'number' ? options.confirmFrames : 2;
     this.duplicateCooldownMs = typeof options.duplicateCooldownMs === 'number' ? options.duplicateCooldownMs : 2000;
     this.beepOnScan = options.beepOnScan !== false;
+    this.sound = options.sound !== undefined ? options.sound : (options.soundPreset || options.soundUrl || 'pos');
     this.vibrateOnScan = options.vibrateOnScan !== false;
     this.roi = options.roi !== undefined ? options.roi : { widthRatio: 0.94, heightRatio: 0.42 };
 
@@ -170,32 +317,56 @@ export class BarQRScanner {
     this.isWasmReading = false;
     this.wasmDecodeCount = 0;
 
-    this.audioCtx = null;
     this.softwareZoomFactor = 1.0;
   }
 
+  /**
+   * Explicitly unlocks audio playback on iOS/iPadOS if not yet activated.
+   */
+  unlockAudio() {
+    return unlockAudio();
+  }
+
+  /**
+   * Plays confirmation sound on successful scan based on configured sound preset, tone parameters, or audio URL.
+   */
   beep() {
     if (!this.beepOnScan) return;
     try {
-      if (!this.audioCtx) {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (AudioContextClass) this.audioCtx = new AudioContextClass();
+      // 1. If custom callback function provided
+      if (typeof this.sound === 'function') {
+        const ctx = unlockAudio();
+        this.sound(ctx);
+        return;
       }
-      if (this.audioCtx && this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume();
-      }
-      if (!this.audioCtx) return;
 
-      const osc = this.audioCtx.createOscillator();
-      const gain = this.audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1760, this.audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.15, this.audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.08);
-      osc.connect(gain);
-      gain.connect(this.audioCtx.destination);
-      osc.start();
-      osc.stop(this.audioCtx.currentTime + 0.08);
+      // 2. If sound is a string
+      if (typeof this.sound === 'string') {
+        const lowerPreset = this.sound.toLowerCase().trim();
+        if (SOUND_PRESETS[lowerPreset]) {
+          const ctx = unlockAudio();
+          if (ctx) SOUND_PRESETS[lowerPreset](ctx, ctx.currentTime);
+          return;
+        }
+
+        // Custom audio URL (mp3, wav, etc.)
+        if (typeof Audio !== 'undefined') {
+          const audio = new Audio(this.sound);
+          audio.play().catch(() => {});
+        }
+        return;
+      }
+
+      // 3. If sound is a configuration object
+      if (typeof this.sound === 'object' && this.sound !== null) {
+        const ctx = unlockAudio();
+        if (ctx) playCustomTone(ctx, ctx.currentTime, this.sound);
+        return;
+      }
+
+      // 4. Default: 'pos' preset (880 Hz POS tone)
+      const ctx = unlockAudio();
+      if (ctx) SOUND_PRESETS.pos(ctx, ctx.currentTime);
     } catch {
       // Audio autoplay policy fallback
     }
@@ -500,6 +671,7 @@ export class BarQRScanner {
 
   async start() {
     if (this.isRunning) return;
+    this.unlockAudio();
     await this.initDetector();
     const info = await this.startStream();
     this.isRunning = true;
@@ -522,10 +694,6 @@ export class BarQRScanner {
 
   destroy() {
     this.stop();
-    if (this.audioCtx) {
-      try { this.audioCtx.close(); } catch {}
-      this.audioCtx = null;
-    }
     this.barcodeDetector = null;
     this.zxingWasm = null;
   }

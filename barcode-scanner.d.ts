@@ -20,6 +20,25 @@ export interface ROIConfig {
   heightRatio: number;
 }
 
+export type SoundPreset = 'pos' | 'chirp' | 'industrial' | 'bell' | 'double' | 'chord';
+
+export interface SoundConfig {
+  /** Frequency in Hz (e.g. 880, 1760, 2400) */
+  frequency?: number;
+  /** Duration in seconds (e.g. 0.15) */
+  duration?: number;
+  /** Gain / volume from 0.0 to 1.0 (default: 0.3) */
+  volume?: number;
+  /** Oscillator wave type (default: 'sine') */
+  type?: OscillatorType;
+}
+
+export type SoundOption =
+  | SoundPreset
+  | SoundConfig
+  | string
+  | ((ctx: AudioContext | null) => void);
+
 export interface ScannerOptions {
   /** Target <video> element (required for Headless mode, automatically created by .mount()) */
   videoElement?: HTMLVideoElement;
@@ -37,6 +56,12 @@ export interface ScannerOptions {
   duplicateCooldownMs?: number;
   /** Audio beep on successful scan (default: true) */
   beepOnScan?: boolean;
+  /** Sound customization: preset name ('pos' | 'chirp' | 'industrial' | 'bell' | 'double' | 'chord'), synthesis config, audio file URL, or custom callback */
+  sound?: SoundOption;
+  /** Convenient preset selector ('pos' | 'chirp' | 'industrial' | 'bell' | 'double' | 'chord') */
+  soundPreset?: SoundPreset;
+  /** Convenient audio URL selector (e.g. '/sounds/scan.mp3') */
+  soundUrl?: string;
   /** Haptic vibration on scan when supported (default: true) */
   vibrateOnScan?: boolean;
   /** Region of interest (ROI) ratios, or null for full frame */
@@ -63,10 +88,14 @@ export interface StartInfo {
 }
 
 export class BarQRScanner {
+  sound: SoundOption;
   constructor(options?: ScannerOptions);
   start(): Promise<StartInfo>;
   stop(): void;
   destroy(): void;
+  unlockAudio(): AudioContext | null;
+  beep(): void;
+  vibrate(): void;
   switchRearCamera(): Promise<string>;
   refreshCamera(): Promise<void>;
   setTorch(enabled: boolean): Promise<boolean>;
@@ -80,6 +109,8 @@ export class BarQRScanner {
   ): Promise<BarQRScanner>;
 }
 
+export function unlockAudio(): AudioContext | null;
+export const SOUND_PRESETS: Record<SoundPreset, (ctx: AudioContext, now: number) => void>;
 export { BarQRScanner as UniversalBarcodeScanner };
 export { BarQRScanner as MobileBarcodeScanner };
 export default BarQRScanner;

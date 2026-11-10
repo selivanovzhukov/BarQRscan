@@ -142,12 +142,68 @@ export const BarcodeScannerModal: React.FC<Props> = ({ onDetected }) => {
 | `formats` | `Array` | All formats | Array of formats: `'code_128'`, `'ean_13'`, `'qr_code'`, etc. |
 | `confirmFrames` | `number` | `2` | Required consecutive matching frames (1 for QR and Code-128). |
 | `duplicateCooldownMs`| `number` | `2000` | Minimum delay before re-scanning the same code (in ms). |
-| `beepOnScan` | `boolean` | `true` | Plays a brief 1760 Hz audio chime on detection. |
+| `beepOnScan` | `boolean` | `true` | Audio confirmation on detection (set `false` to mute). |
+| `sound` | `string \| object \| function` | `'pos'` | Sound preset (`'pos'`, `'chirp'`, `'industrial'`, `'bell'`, `'double'`, `'chord'`), synthesis config object, audio URL, or custom generator callback. |
 | `vibrateOnScan` | `boolean` | `true` | Triggers a 50 ms haptic pulse on mobile devices. |
 | `roi` | `object` | `{ widthRatio: 0.94, heightRatio: 0.42 }` | Crop region for performance and aiming. |
 | `forceWasm` | `boolean` | `false` | Force ZXing-C++ WASM even if native BarcodeDetector exists. |
 | `wasmIifeUrl` | `string` | jsDelivr CDN | Custom URL to the zxing-wasm IIFE script bundle. |
 | `wasmBinaryDir` | `string` | jsDelivr CDN | Custom directory containing the `zxing_reader.wasm` binary. |
+
+---
+
+## Sound Customization
+
+The scanner provides 3 ways to tailor audio confirmation:
+
+### 1. Built-in Sound Presets
+Choose from presets tuned for different use cases:
+```javascript
+const scanner = new BarQRScanner({
+  sound: 'industrial' // 'pos' | 'chirp' | 'industrial' | 'bell' | 'double' | 'chord'
+});
+```
+- `'pos'` (default): Clean 880 Hz POS confirmation tone with soft decay.
+- `'chirp'`: Snappy upward chirp (1200 &rarr; 1760 Hz) popular in modern iOS apps.
+- `'industrial'`: Penetrating 2400 Hz beep for noisy warehouses and fast batch work.
+- `'bell'`: Gentle 1046.5 Hz (C6) bell tone with lingering acoustic tail.
+- `'double'`: Rapid affirmative two-step chime (880 Hz + 1320 Hz).
+- `'chord'`: Polyphonic major triad chord (C5 + E5 + G5).
+
+### 2. Synthesizer Tone Configuration
+Fine-tune frequency, duration, volume, and waveform:
+```javascript
+const scanner = new BarQRScanner({
+  sound: {
+    frequency: 1760, // in Hz
+    duration: 0.08,  // in seconds
+    volume: 0.35,    // 0.0 to 1.0
+    type: 'sine'     // 'sine' | 'triangle' | 'square' | 'sawtooth'
+  }
+});
+```
+
+### 3. Custom Audio File or Generator Callback
+Point to an audio file or write custom Web Audio synthesis:
+```javascript
+// A. Custom audio file URL
+const scanner = new BarQRScanner({
+  sound: '/assets/sounds/beep.mp3'
+});
+
+// B. Custom generator function (receives shared AudioContext)
+const scanner = new BarQRScanner({
+  sound: (ctx) => {
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.frequency.setValueAtTime(1500, now);
+    osc.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  }
+});
+```
 
 ---
 
